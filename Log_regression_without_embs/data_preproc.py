@@ -119,7 +119,6 @@ def preproc(path0):
         test_size=0.1, random_state=42, stratify=X_train[["target"]])
 
     cats = X_test["cat31_grouped"]
-    y_test_w_var = X_test[["target", "variantid1", "variantid2"]]  # ----- Сохраняем для метрики
 
     y_test = X_test[["target"]]
     X_test = X_test.drop(["target", "variantid1", "variantid2", "cat31_grouped"], axis=1)
@@ -154,11 +153,15 @@ def preproc(path0):
         row.extend([X_test[feats[b]].iloc[i] for b in [1, 3, 6, 7]])
         X_test_final.append(row)
 
+    y_test_met = y_test.reset_index(drop=True)
+    cats = cats.reset_index(drop=True)
+    y_test_met = y_test_met.T
+
     # print(len(X_train_final))
     # print(y_train)
     # print(len(X_test_final))
     # print(y_test)
-    return X_train_final, y_train, X_test_final, y_test, y_test_w_var, cats
+    return X_train_final, y_train, X_test_final, X_test, y_test, y_test_met, cats
 
 # path0 = "C:/Users/druzh/Project_python/ozon_top_1/Datasets/"
 #
