@@ -1,16 +1,18 @@
 import optuna
-from catboost import CatBoostClassifier
-from keras.models import Sequential
-from keras.layers import Dense
 import keras
+import tensorflow as tf
 import numpy as np
 import pandas as pd
+from catboost import CatBoostClassifier
+from keras.models import Sequential
+from keras.optimizers import Adam
+from keras.layers import Dense
+from keras.models import Model
 from sklearn.decomposition import PCA
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import f1_score
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import accuracy_score, recall_score
-
 from sklearn.metrics import precision_score
 
 
@@ -49,26 +51,36 @@ for i in range(len(X_train)):
 X_train_final = np.array(X_train_final)
 y_train = np.array(y_train)
 
-X_reshaped = np.expand_dims(X_train_final, axis=2)
+print(X_train_final.shape)
+print(y_train.shape)
 
-print(X_reshaped)
+features_dataset = tf.data.Dataset.from_tensor_slices(X_train_final)
+labels_dataset = tf.data.Dataset.from_tensor_slices(y_train)
+train_dataset = tf.data.Dataset.zip((features_dataset, labels_dataset)).batch(128).prefetch(tf.data.AUTOTUNE)
+
 model = keras.models.Sequential([
+    keras.layers.Input(shape=(384, 1)),
     keras.layers.Conv1D(filters=64, kernel_size=2,
                         strides=4, padding="causal",
-                        activation="relu",
-                        input_shape=[384, 1]),
-    keras.layers.Conv1D(filters=32, kernel_size=2,
-                        strides=4, padding="causal",
                         activation="relu"),
-    keras.layers.Dense(32, activation='relu'),
-    keras.layers.Dense(1, activation='sigmoid')
+    keras.layers.Flatten(),
+    keras.layers.Dense(64, activation='relu'),
+    keras.layers.Dense(1, activation='softmax')
 ])
 
-model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])
+optimizer = Adam(learning_rate=0.000015)
+model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=["accuracy"])
 
-model.fit(X_train_final, y_train, epochs=150)
+print(model.summary())
+
+model.fit(train_dataset, epochs=350)
 
 model.save('fit_forward')
+
+x = model.layers[-2].output
+x = Dense(64)(x)
+predictions = Dense(32, activation="softmax")(x)
+model = Model(inputs=model.input, outputs=predictions)
 pred = model.predict(X_train_final)
 
 embeddings = []
@@ -156,6 +168,7 @@ print('Best accuracy:', best_accuracy)
 
 model = CatBoostClassifier(**best_params)
 model.fit(X_train, Y_train)
+model.save_model("fit_forward_with_catboost.cbm")
 
 prediction = model.predict(X_test)
 
@@ -173,5 +186,5 @@ print("Precision:", precision)
 print("Recall:", recall)
 
 
-model.save_model("fit_forward_with_catboost.cbm")
+
 

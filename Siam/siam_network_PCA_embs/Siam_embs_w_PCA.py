@@ -79,12 +79,14 @@ X_train, X_test, Y_train, Y_test = train_test_split(X, y, test_size=0.1, random_
 X1_train, X2_train = X_train[::, :len(X_train[0]) // 2], X_train[::, len(X_train[0]) // 2:]
 X1_test, X2_test = X_test[::, :len(X_test[0]) // 2], X_test[::, len(X_test[0]) // 2:]
 
-
+print("я тут все обработал, все хорошо, милорд!")
 def create_siamese_network(input_shape, learning_rate, dropout_rate, num_neurons, num_layers):
+
+    print("а мы тут все плюшками балуемся")
     input1 = Input(shape=input_shape)
     input2 = Input(shape=input_shape)
 
-    dense_layer = Dense(num_neurons, activation='sigmoid')
+    dense_layer = Dense(num_neurons, activation='relu')
 
     x1 = dense_layer(input1)
     x1 = Dropout(dropout_rate)(x1)
@@ -92,14 +94,14 @@ def create_siamese_network(input_shape, learning_rate, dropout_rate, num_neurons
     x2 = Dropout(dropout_rate)(x2)
 
     for _ in range(num_layers):
-        x1 = Dense(num_neurons, activation='sigmoid')(x1)
+        x1 = Dense(num_neurons, activation='relu')(x1)
         x1 = Dropout(dropout_rate)(x1)
-        x2 = Dense(num_neurons, activation='sigmoid')(x2)
+        x2 = Dense(num_neurons, activation='relu')(x2)
         x2 = Dropout(dropout_rate)(x2)
 
     diff = Subtract()([x1, x2])
 
-    output = Dense(1, activation='sigmoid')(diff)
+    output = Dense(1, activation='softmax')(diff)
 
     model = Model(inputs=[input1, input2], outputs=output)
 
@@ -112,7 +114,7 @@ def create_siamese_network(input_shape, learning_rate, dropout_rate, num_neurons
 def objective(trial):
     learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 2e-2)
     dropout_rate = trial.suggest_uniform('dropout_rate', 0.0, 0.5)
-    num_neurons = trial.suggest_int('num_neurons', 256, 1024)
+    num_neurons = trial.suggest_int('num_neurons', 512, 1024)
     num_layers = trial.suggest_int('num_layers', 1, 4)
     epochs = trial.suggest_int('epochs', 100, 300)
 
@@ -138,7 +140,6 @@ def objective(trial):
     y_pred = np.round(y_pred).flatten()
 
     f1 = f1_score(Y_test, y_pred)
-
     return f1
 
 
