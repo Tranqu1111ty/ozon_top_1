@@ -53,12 +53,15 @@ X_reshaped = np.expand_dims(X_train_final, axis=2)
 
 print(X_reshaped)
 model = keras.models.Sequential([
-    keras.layers.Conv1D(filters=32, kernel_size=2,
+    keras.layers.Conv1D(filters=64, kernel_size=2,
                         strides=4, padding="causal",
                         activation="relu",
                         input_shape=[384, 1]),
-    keras.layers.LSTM(16),
-    keras.layers.Dense(16, activation='relu'),
+    keras.layers.Conv1D(filters=32, kernel_size=2,
+                        strides=4, padding="causal",
+                        activation="relu"),
+    keras.layers.Dense(32, activation='relu'),
+    keras.layers.Dense(1, activation='sigmoid')
 ])
 
 model.compile(loss='binary_crossentropy', optimizer='adam', metrics=['accuracy'])

@@ -81,92 +81,70 @@ X1_test, X2_test = X_test[::, :len(X_test[0]) // 2], X_test[::, len(X_test[0]) /
 
 
 def create_siamese_network(input_shape, learning_rate, dropout_rate, num_neurons, num_layers):
-    # Входные слои для эмбеддингов двух товаров
     input1 = Input(shape=input_shape)
     input2 = Input(shape=input_shape)
 
-    # Полносвязные слои для обработки эмбеддингов
     dense_layer = Dense(num_neurons, activation='sigmoid')
 
-    # Обработка эмбеддингов с помощью полносвязных слоев с Dropout
     x1 = dense_layer(input1)
     x1 = Dropout(dropout_rate)(x1)
     x2 = dense_layer(input2)
     x2 = Dropout(dropout_rate)(x2)
 
-    # Добавление дополнительных слоев
     for _ in range(num_layers):
         x1 = Dense(num_neurons, activation='sigmoid')(x1)
         x1 = Dropout(dropout_rate)(x1)
         x2 = Dense(num_neurons, activation='sigmoid')(x2)
         x2 = Dropout(dropout_rate)(x2)
 
-    # Разность эмбеддингов товаров
     diff = Subtract()([x1, x2])
 
-    # Выходной слой для определения схожести
     output = Dense(1, activation='sigmoid')(diff)
 
-    # Создание модели
     model = Model(inputs=[input1, input2], outputs=output)
 
-    # Компиляция модели с оптимизатором Adam и указанным learning rate
     optimizer = Adam(learning_rate=learning_rate)
     model.compile(loss='binary_crossentropy', optimizer=optimizer)
 
     return model
 
 
-# Функция для оптимизации гиперпараметров с помощью Optuna
 def objective(trial):
-    # Определение гиперпараметров для оптимизации
     learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 2e-2)
     dropout_rate = trial.suggest_uniform('dropout_rate', 0.0, 0.5)
     num_neurons = trial.suggest_int('num_neurons', 256, 1024)
     num_layers = trial.suggest_int('num_layers', 1, 4)
     epochs = trial.suggest_int('epochs', 100, 300)
 
-    # Создание сиамской нейронной сети с текущими гиперпараметрами
-    # Создание сиамской нейронной сети с текущими гиперпараметрами
     input_shape = X1_train.shape[1:]
     siamese_model = create_siamese_network(input_shape, learning_rate, dropout_rate, num_neurons, num_layers)
 
-    # Early stopping
     early_stopping = EarlyStopping(monitor='val_loss', patience=50)
 
-    # Определение пути для сохранения модели
     checkpoint_dir = r'C:\Users\druzh\Project_python\ozon_top_1\Siam'
     os.makedirs(checkpoint_dir, exist_ok=True)
     checkpoint_path = os.path.join(checkpoint_dir, 'best_model.h5')
 
-    # Создание колбэка для сохранения лучшей модели
     checkpoint_callback = ModelCheckpoint(checkpoint_path, monitor='val_loss', save_best_only=True, mode='max')
 
-    # Обучение модели с текущими гиперпараметрами и early stopping
     siamese_model.fit([X1_train, X2_train], Y_train, epochs=epochs, batch_size=1, verbose=0,
                       validation_data=([X1_test, X2_test], Y_test),
                       callbacks=[early_stopping, checkpoint_callback])
 
-    # Загрузка лучшей модели
     best_model = create_siamese_network(input_shape, learning_rate, dropout_rate, num_neurons, num_layers)
     best_model.load_weights(checkpoint_path)
 
-    # Предсказание на тестовых данных с использованием лучшей модели
     y_pred = best_model.predict([X1_test, X2_test])
     y_pred = np.round(y_pred).flatten()
 
-    # Вычисление метрики F1
     f1 = f1_score(Y_test, y_pred)
 
-    # Возвращение значения метрики F1 в качестве целевой функции оптимизации
     return f1
 
 
-# Создание и запуск оптимизации гиперпараметров с помощью Optuna
 study = optuna.create_study(direction='maximize')
 study.optimize(objective, n_trials=20)
 
-# Вывод результатов оптимизации
 best_trial = study.best_trial
 print('Best trial:')
 print('  F1 Score: {:.6f}'.format(best_trial.value))
