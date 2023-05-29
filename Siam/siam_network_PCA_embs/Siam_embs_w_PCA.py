@@ -2,6 +2,7 @@ import numpy as np
 import pandas as pd
 import joblib
 import os
+import tensorflow as tf
 from tensorflow.keras.models import Model, load_model
 from tensorflow.keras.layers import Input, Dense, Subtract, Dropout
 from tensorflow.keras.optimizers import Adam
@@ -11,8 +12,8 @@ from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score
 import optuna
 
-dataset = pd.read_parquet(r"C:\Users\druzh\Project_python\ozon_top_1\Datasets\train_pairs.parquet")
-etl = pd.read_parquet(r"C:\Users\druzh\Project_python\ozon_top_1\Datasets\train_data.parquet")
+dataset = pd.read_parquet(r"train_pairs.parquet")
+etl = pd.read_parquet(r"train_data.parquet")
 
 features = (
     dataset
@@ -29,7 +30,7 @@ features = (
 )
 
 embeddings = []
-for i in features['main_pic_embeddings_resnet_v11'].values:
+for i in features['main_pic_embeddings_resnet_v11'].values[:60]:
     embeddings.append(i[0])
 
 embeddings = np.array(embeddings)
@@ -39,7 +40,7 @@ pca = PCA(n_components=30)
 compressed_embeddings_main_pic = pca.fit_transform(embeddings)
 
 name_bert_641_embedding = []
-for i in features['name_bert_641'].values:
+for i in features['name_bert_641'].values[:60]:
     name_bert_641_embedding.append(i)
 
 name_bert_641_embedding_final = np.array(name_bert_641_embedding)
@@ -48,7 +49,7 @@ pca = PCA(n_components=30)
 
 compressed_embeddings_name_bert_641 = pca.fit_transform(name_bert_641_embedding_final)
 embeddings_main_2 = []
-for i in features['main_pic_embeddings_resnet_v12'].values:
+for i in features['main_pic_embeddings_resnet_v12'].values[:60]:
     embeddings_main_2.append(i[0])
 
 embeddings_main_2_final = np.array(embeddings_main_2)
@@ -57,7 +58,7 @@ pca = PCA(n_components=30)
 
 compressed_embeddings_main_pic_2 = pca.fit_transform(embeddings_main_2_final)
 name_bert_642_embedding = []
-for i in features['name_bert_642'].values:
+for i in features['name_bert_642'].values[:60]:
     name_bert_642_embedding.append(i)
 
 name_bert_642_embedding_final = np.array(name_bert_642_embedding)
@@ -73,13 +74,14 @@ for i in range(len(compressed_embeddings_main_pic)):
     X.append(row)
 
 X = np.array(X)
-y = features['target'].values
+y = features['target'].values[:60]
 X_train, X_test, Y_train, Y_test = train_test_split(X, y, test_size=0.1, random_state=42)
 
 X1_train, X2_train = X_train[::, :len(X_train[0]) // 2], X_train[::, len(X_train[0]) // 2:]
 X1_test, X2_test = X_test[::, :len(X_test[0]) // 2], X_test[::, len(X_test[0]) // 2:]
 
 print("я тут все обработал, все хорошо, милорд!")
+
 def create_siamese_network(input_shape, learning_rate, dropout_rate, num_neurons, num_layers):
 
     print("а мы тут все плюшками балуемся")
@@ -106,7 +108,7 @@ def create_siamese_network(input_shape, learning_rate, dropout_rate, num_neurons
     model = Model(inputs=[input1, input2], outputs=output)
 
     optimizer = Adam(learning_rate=learning_rate)
-    model.compile(loss='binary_crossentropy', optimizer=optimizer)
+    model.compile(loss='binary_crossentropy', optimizer=optimizer, metrics=["accuracy"])
 
     return model
 
@@ -114,8 +116,8 @@ def create_siamese_network(input_shape, learning_rate, dropout_rate, num_neurons
 def objective(trial):
     learning_rate = trial.suggest_loguniform('learning_rate', 1e-6, 2e-2)
     dropout_rate = trial.suggest_uniform('dropout_rate', 0.0, 0.5)
-    num_neurons = trial.suggest_int('num_neurons', 512, 1024)
-    num_layers = trial.suggest_int('num_layers', 1, 4)
+    num_neurons = 512
+    num_layers = 4
     epochs = trial.suggest_int('epochs', 100, 300)
 
     input_shape = X1_train.shape[1:]
@@ -123,9 +125,9 @@ def objective(trial):
 
     early_stopping = EarlyStopping(monitor='val_loss', patience=50)
 
-    checkpoint_dir = r'C:\Users\druzh\Project_python\ozon_top_1\Siam'
+    checkpoint_dir = r'Siam'
     os.makedirs(checkpoint_dir, exist_ok=True)
-    checkpoint_path = os.path.join(checkpoint_dir, 'best_model.h5')
+    checkpoint_path = os.path.join(checkpoint_dir, '../Siam_model_from_server/best_model.h5')
 
     checkpoint_callback = ModelCheckpoint(checkpoint_path, monitor='val_loss', save_best_only=True, mode='max')
 
@@ -153,7 +155,7 @@ print('  Params:')
 for key, value in best_trial.params.items():
     print('    {}: {}'.format(key, value))
 
-model = load_model(r'C:\Users\druzh\Project_python\ozon_top_1\Siam\best_model.h5')
+model = load_model(r'Siam\best_model.h5')
 prediction = model.predict([X1_test, X2_test])
 prediction = np.round(prediction).flatten()
 f1 = f1_score(Y_test, prediction)
