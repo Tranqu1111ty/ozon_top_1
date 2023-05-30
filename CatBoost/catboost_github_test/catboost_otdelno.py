@@ -126,7 +126,7 @@ def objective(trial):
 
 
 study = optuna.create_study(direction="maximize")
-study.optimize(objective, n_trials=20)
+study.optimize(objective, n_trials=110)
 
 best_model = CatBoostClassifier(**study.best_params)
 best_model.fit(train_processed_pool,
